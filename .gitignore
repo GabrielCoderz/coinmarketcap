@@ -1,0 +1,9 @@
+# SQL Server files
+db/mysql
+db/pg
+
+logs/*
+
+dags/__pycache__
+
+.env
