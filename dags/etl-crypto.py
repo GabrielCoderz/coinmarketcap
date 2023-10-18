@@ -6,8 +6,15 @@ from requests import Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import pandas as pd
 import sqlalchemy
+from dotenv import load_dotenv
+import uuid
 import json
+import os
 
+load_dotenv()
+
+API_KEY = os.getenv('API_KEY')
+api_url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 path_temp_csv = "/tmp/dataset.csv"
 
 dag = DAG(
@@ -18,20 +25,21 @@ dag = DAG(
 )
 
 def _extract():
-    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
     parameters = {
         'start':'1',
         'limit':'500',
         'convert':'USD'
     }
+
     headers = {
         'Accepts': 'application/json',
-        'X-CMC_PRO_API_KEY': 'a2379430-9dde-4d51-9cfe-7393a6049d4a',
+        'X-CMC_PRO_API_KEY': API_KEY,
     }
 
     session = Session()
     session.headers.update(headers)
 
+    id = []
     name = []
     symbol = []
     data_added = []
@@ -47,10 +55,11 @@ def _extract():
     percent_change_7d = []
 
     try:
-        response = session.get(url, params=parameters)
+        response = session.get(api_url, params=parameters)
         data = json.loads(response.text)
         
         for coin in data['data']:
+            id.append(uuid.uuid4())
             name.append(coin['name'])
             symbol.append(coin['symbol'])
             data_added.append(coin['date_added'])
@@ -65,6 +74,7 @@ def _extract():
             percent_change_7d.append(coin['quote']['USD']['percent_change_7d'])
 
         coin_dict = {
+            "id": id,
             "name" : name,
             "symbol": symbol,
             "data_added" : data_added,
@@ -74,13 +84,12 @@ def _extract():
             "circulating_supply" : circulating_supply,
             "total_supply": total_supply,
             "max_supply": max_supply,
-            "volume_24h": volume_24h,
             "percent_change_1h": percent_change_1h,
             "percent_change_24h": percent_change_24h,
             "percent_change_7d": percent_change_7d
         }
 
-        coins_df = pd.DataFrame(coin_dict, columns = ["name", "symbol", "data_added", "last_updated","price","volume_24h","circulating_supply","total_supply","max_supply","percent_change_1h","percent_change_24h","percent_change_7d"])
+        coins_df = pd.DataFrame(coin_dict)
 
         coins_df.to_csv(path_temp_csv, index=False)
         
